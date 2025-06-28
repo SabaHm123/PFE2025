@@ -1,10 +1,10 @@
 pipeline {
-  agent {
-    docker { image 'maven:3.9.10-eclipse-temurin-17' }
-  }
+  agent any
+
   environment {
     PROJECT_DIR = 'BackendPFE'
   }
+
   stages {
     stage('Checkout') {
       steps {
@@ -15,13 +15,10 @@ pipeline {
     stage('Clean Docker Containers') {
       steps {
         dir("${env.PROJECT_DIR}") {
-          script {
-            // Essaye d'arrêter et supprimer les containers, ignore erreur si ils n'existent pas
-            bat '''
+          bat '''
             docker-compose down || echo "No containers to stop"
             docker rm -f mysql-sql-bsn mail-dev-bsn || echo "Containers already removed"
-            '''
-          }
+          '''
         }
       }
     }
@@ -37,12 +34,10 @@ pipeline {
     stage('Build Project') {
       steps {
         dir("${env.PROJECT_DIR}") {
-          sh 'mvn clean package -DskipTests'
+          bat 'mvn clean package -DskipTests'
         }
       }
     }
-
-    // Ajouter ici d'autres stages comme tests, sonar, etc.
 
     stage('Stop Docker Services') {
       steps {
@@ -52,6 +47,7 @@ pipeline {
       }
     }
   }
+
   post {
     always {
       echo 'Pipeline terminé.'
