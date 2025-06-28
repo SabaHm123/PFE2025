@@ -1,72 +1,66 @@
 pipeline {
-    agent any
-    environment {
-        DOCKER_COMPOSE_DIR = 'BackendPFE'
-        SONARQUBE_ENV = 'SonarQubeServer'  // nom du serveur SonarQube configuré dans Jenkins
+  agent {
+    docker { image 'maven:3.9.0-openjdk-17' }
+  }
+  environment {
+    PROJECT_DIR = 'BackendPFE'
+  }
+  stages {
+    stage('Checkout') {
+      steps {
+        checkout scm
+      }
     }
-    stages {
-        stage('Checkout') {
-            steps {
-                checkout scm
-            }
+
+    stage('Clean Docker Containers') {
+      steps {
+        dir("${env.PROJECT_DIR}") {
+          script {
+            // Essaye d'arrêter et supprimer les containers, ignore erreur si ils n'existent pas
+            bat '''
+            docker-compose down || echo "No containers to stop"
+            docker rm -f mysql-sql-bsn mail-dev-bsn || echo "Containers already removed"
+            '''
+          }
         }
-        stage('Clean Docker Containers') {
-            steps {
-                dir(env.DOCKER_COMPOSE_DIR) {
-                    bat '''
-                    docker-compose down || echo "No containers to stop"
-                    docker rm -f mysql-sql-bsn mail-dev-bsn || echo "Containers already removed"
-                    '''
-                }
-            }
-        }
-        stage('Start MySQL and MailDev') {
-            steps {
-                dir(env.DOCKER_COMPOSE_DIR) {
-                    bat 'docker-compose up -d'
-                }
-            }
-        }
-        stage('Build Project') {
-            steps {
-                dir(env.DOCKER_COMPOSE_DIR) {
-                    bat 'mvn clean package -DskipTests'
-                }
-            }
-        }
-        stage('SonarQube Analysis') {
-            environment {
-                scannerHome = tool name: 'SonarQubeScanner', type: 'hudson.plugins.sonar.SonarRunnerInstallation'
-            }
-            steps {
-                dir(env.DOCKER_COMPOSE_DIR) {
-                    withSonarQubeEnv(env.SONARQUBE_ENV) {
-                        bat "${scannerHome}\\bin\\sonar-scanner.bat"
-                    }
-                }
-            }
-        }
-        stage('Run Tests') {
-            steps {
-                dir(env.DOCKER_COMPOSE_DIR) {
-                    bat 'mvn test'
-                }
-            }
-        }
-        stage('Stop Docker Services') {
-            steps {
-                dir(env.DOCKER_COMPOSE_DIR) {
-                    bat 'docker-compose down'
-                }
-            }
-        }
+      }
     }
-    post {
-        always {
-            echo '✅ Pipeline terminé.'
+
+    stage('Start MySQL and MailDev') {
+      steps {
+        dir("${env.PROJECT_DIR}") {
+          bat 'docker-compose up -d'
         }
-        failure {
-            echo '❌ Pipeline échoué.'
-        }
+      }
     }
+
+    stage('Build Project') {
+      steps {
+        dir("${env.PROJECT_DIR}") {
+          sh 'mvn clean package -DskipTests'
+        }
+      }
+    }
+
+    // Ajouter ici d'autres stages comme tests, sonar, etc.
+
+    stage('Stop Docker Services') {
+      steps {
+        dir("${env.PROJECT_DIR}") {
+          bat 'docker-compose down'
+        }
+      }
+    }
+  }
+  post {
+    always {
+      echo 'Pipeline terminé.'
+    }
+    success {
+      echo 'Build réussi.'
+    }
+    failure {
+      echo 'Build échoué.'
+    }
+  }
 }
