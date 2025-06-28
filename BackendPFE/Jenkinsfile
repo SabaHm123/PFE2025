@@ -34,7 +34,8 @@ pipeline {
     stage('Build Project') {
       steps {
         dir("${env.PROJECT_DIR}") {
-          bat 'mvn clean package -DskipTests'
+          bat 'mvnd clean package -DskipTests'
+
         }
       }
     }
