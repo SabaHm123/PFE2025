@@ -40,28 +40,28 @@ pipeline {
       }
     }
 
-    stage('SonarQube Analysis') {
-      steps {
-        withSonarQubeEnv('SonarQube') {
-          dir("${env.PROJECT_DIR}") {
-            bat """
-              mvnd sonar:sonar ^
-                -Dsonar.projectKey=com.PFE:BackendPFE ^
-                -Dsonar.host.url=http://localhost:9000 ^
-                -Dsonar.login=squ_751443ec224600759633b50839c067d88e44e9a2
-            """
-          }
-        }
+   stage('SonarQube Analysis') {
+  steps {
+    withSonarQubeEnv('MySonarQubeFrontend') {
+      dir("${env.PROJECT_DIR}") {
+        bat """
+          mvnd sonar:sonar ^
+            -Dsonar.projectKey=com.PFE:BackendPFE ^
+            -Dsonar.host.url=http://localhost:9000 ^
+            -Dsonar.login=squ_751443ec224600759633b50839c067d88e44e9a2
+        """
       }
     }
+  }
+}
 
-    stage('SonarQube Quality Gate') {
-      steps {
-        timeout(time: 2, unit: 'MINUTES') {
-          waitForQualityGate abortPipeline: true
-        }
-      }
+stage('SonarQube Quality Gate') {
+  steps {
+    timeout(time: 2, unit: 'MINUTES') {
+      waitForQualityGate abortPipeline: true
     }
+  }
+}
 
     stage('Stop Docker Services') {
       steps {
