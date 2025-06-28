@@ -1,80 +1,72 @@
 pipeline {
     agent any
-
     environment {
-        SONARQUBE_ENV = 'SonarQubeServer'
-        DOCKER_COMPOSE_FILE = 'docker-compose.yml'  // le fichier est à la racine
-        PROJECT_DIR = 'BackendPFE'
+        DOCKER_COMPOSE_DIR = 'BackendPFE'
+        SONARQUBE_ENV = 'SonarQubeServer'  // nom du serveur SonarQube configuré dans Jenkins
     }
-
     stages {
         stage('Checkout') {
             steps {
-                echo '📥 Cloning Git repository...'
-                git url: 'https://github.com/SabaHm123/PFE2025.git', branch: 'main'
+                checkout scm
             }
         }
-
-        stage('Start MySQL and MailDev') {
+        stage('Clean Docker Containers') {
             steps {
-                echo '🐳 Starting Docker containers...'
-                bat "docker-compose -f ${DOCKER_COMPOSE_FILE} up -d"
-
-                echo '⏳ Waiting for MySQL to be ready...'
-                bat '''
-                    for /l %%x in (1, 1, 30) do (
-                        docker exec mysql-sql-bsn mysqladmin ping -hlocalhost --silent && exit /b 0
-                        timeout /t 2 >nul
-                    )
-                '''
-            }
-        }
-
-        stage('Build Project') {
-            steps {
-                echo '🔧 Building Spring Boot app...'
-                dir("${PROJECT_DIR}") {
-                    bat "./mvnw.cmd clean install -DskipTests"
+                dir(env.DOCKER_COMPOSE_DIR) {
+                    bat '''
+                    docker-compose down || echo "No containers to stop"
+                    docker rm -f mysql-sql-bsn mail-dev-bsn || echo "Containers already removed"
+                    '''
                 }
             }
         }
-
-        stage('SonarQube Analysis') {
+        stage('Start MySQL and MailDev') {
             steps {
-                echo '🔍 Running SonarQube analysis...'
-                dir("${PROJECT_DIR}") {
-                    withSonarQubeEnv("${SONARQUBE_ENV}") {
-                        bat "./mvnw.cmd sonar:sonar"
+                dir(env.DOCKER_COMPOSE_DIR) {
+                    bat 'docker-compose up -d'
+                }
+            }
+        }
+        stage('Build Project') {
+            steps {
+                dir(env.DOCKER_COMPOSE_DIR) {
+                    bat 'mvn clean package -DskipTests'
+                }
+            }
+        }
+        stage('SonarQube Analysis') {
+            environment {
+                scannerHome = tool name: 'SonarQubeScanner', type: 'hudson.plugins.sonar.SonarRunnerInstallation'
+            }
+            steps {
+                dir(env.DOCKER_COMPOSE_DIR) {
+                    withSonarQubeEnv(env.SONARQUBE_ENV) {
+                        bat "${scannerHome}\\bin\\sonar-scanner.bat"
                     }
                 }
             }
         }
-
         stage('Run Tests') {
             steps {
-                echo '🧪 Running unit tests...'
-                dir("${PROJECT_DIR}") {
-                    bat "./mvnw.cmd test"
-                }
-            }
-            post {
-                always {
-                    junit "${PROJECT_DIR}\\target\\surefire-reports\\*.xml"
+                dir(env.DOCKER_COMPOSE_DIR) {
+                    bat 'mvn test'
                 }
             }
         }
-
         stage('Stop Docker Services') {
             steps {
-                echo '🛑 Stopping containers...'
-                bat "docker-compose -f ${DOCKER_COMPOSE_FILE} down"
+                dir(env.DOCKER_COMPOSE_DIR) {
+                    bat 'docker-compose down'
+                }
             }
         }
     }
-
     post {
         always {
-            echo '✅ Pipeline completed.'
+            echo '✅ Pipeline terminé.'
+        }
+        failure {
+            echo '❌ Pipeline échoué.'
         }
     }
 }
