@@ -1,0 +1,85 @@
+pipeline {
+    agent any
+
+    environment {
+        SONARQUBE_ENV = 'SonarQubeServer'
+        DOCKER_COMPOSE_FILE = 'BackendPFE/docker-compose.yml'
+        PROJECT_DIR = 'BackendPFE'
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                echo ' Cloning Git repository...'
+                git url: 'https://github.com/SabaHm123/PFE2025.git', branch: 'main'
+            }
+        }
+
+        stage('Start MySQL and MailDev') {
+            steps {
+                echo ' Starting MySQL and MailDev containers...'
+                dir("${PROJECT_DIR}") {
+                    sh 'docker-compose -f docker-compose.yml up -d'
+                }
+
+                echo ' Waiting for MySQL to be ready...'
+                sh '''
+                    for i in {1..30}; do
+                      docker exec mysql-sql-bsn mysqladmin ping -h"localhost" --silent && break
+                      sleep 2
+                    done
+                '''
+            }
+        }
+
+        stage('Build Project') {
+            steps {
+                echo '🔧 Building Spring Boot application...'
+                dir("${PROJECT_DIR}") {
+                    sh './mvnw clean install -DskipTests'
+                }
+            }
+        }
+
+        stage('SonarQube Analysis') {
+            steps {
+                echo ' Running SonarQube analysis...'
+                dir("${PROJECT_DIR}") {
+                    withSonarQubeEnv("${SONARQUBE_ENV}") {
+                        sh './mvnw sonar:sonar'
+                    }
+                }
+            }
+        }
+
+        stage('Run Tests') {
+            steps {
+                echo ' Running unit tests...'
+                dir("${PROJECT_DIR}") {
+                    sh './mvnw test'
+                }
+            }
+            post {
+                always {
+                    echo ' Publishing JUnit reports...'
+                    junit "${PROJECT_DIR}/target/surefire-reports/*.xml"
+                }
+            }
+        }
+
+        stage('Stop Docker Services') {
+            steps {
+                echo ' Stopping containers...'
+                dir("${PROJECT_DIR}") {
+                    sh 'docker-compose -f docker-compose.yml down'
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            echo '✅ Pipeline completed.'
+        }
+    }
+}
