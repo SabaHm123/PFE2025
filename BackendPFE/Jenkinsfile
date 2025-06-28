@@ -1,6 +1,6 @@
 pipeline {
   agent {
-    docker { image 'maven:3.9.0-jdk-17' }
+    docker { image 'maven:3.9.10-eclipse-temurin-17' }
   }
   environment {
     PROJECT_DIR = 'BackendPFE'
