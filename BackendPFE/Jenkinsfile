@@ -3,50 +3,50 @@ pipeline {
 
     environment {
         SONARQUBE_ENV = 'SonarQubeServer'
-        DOCKER_COMPOSE_FILE = 'BackendPFE/docker-compose.yml'
+        DOCKER_COMPOSE_FILE = 'BackendPFE\\docker-compose.yml'
         PROJECT_DIR = 'BackendPFE'
     }
 
     stages {
         stage('Checkout') {
             steps {
-                echo ' Cloning Git repository...'
+                echo '📥 Cloning Git repository...'
                 git url: 'https://github.com/SabaHm123/PFE2025.git', branch: 'main'
             }
         }
 
         stage('Start MySQL and MailDev') {
             steps {
-                echo ' Starting MySQL and MailDev containers...'
+                echo '🐳 Starting Docker containers...'
                 dir("${PROJECT_DIR}") {
-                    sh 'docker-compose -f docker-compose.yml up -d'
+                    bat "docker-compose -f docker-compose.yml up -d"
                 }
 
-                echo ' Waiting for MySQL to be ready...'
-                sh '''
-                    for i in {1..30}; do
-                      docker exec mysql-sql-bsn mysqladmin ping -h"localhost" --silent && break
-                      sleep 2
-                    done
+                echo '⏳ Waiting for MySQL to be ready...'
+                bat '''
+                    for /l %%x in (1, 1, 30) do (
+                        docker exec mysql-sql-bsn mysqladmin ping -hlocalhost --silent && exit /b 0
+                        timeout /t 2 >nul
+                    )
                 '''
             }
         }
 
         stage('Build Project') {
             steps {
-                echo '🔧 Building Spring Boot application...'
+                echo '🔧 Building Spring Boot app...'
                 dir("${PROJECT_DIR}") {
-                    sh './mvnw clean install -DskipTests'
+                    bat "./mvnw.cmd clean install -DskipTests"
                 }
             }
         }
 
         stage('SonarQube Analysis') {
             steps {
-                echo ' Running SonarQube analysis...'
+                echo '🔍 Running SonarQube analysis...'
                 dir("${PROJECT_DIR}") {
                     withSonarQubeEnv("${SONARQUBE_ENV}") {
-                        sh './mvnw sonar:sonar'
+                        bat "./mvnw.cmd sonar:sonar"
                     }
                 }
             }
@@ -54,24 +54,24 @@ pipeline {
 
         stage('Run Tests') {
             steps {
-                echo ' Running unit tests...'
+                echo '🧪 Running tests...'
                 dir("${PROJECT_DIR}") {
-                    sh './mvnw test'
+                    bat "./mvnw.cmd test"
                 }
             }
             post {
                 always {
-                    echo ' Publishing JUnit reports...'
-                    junit "${PROJECT_DIR}/target/surefire-reports/*.xml"
+                    echo '📄 Publishing JUnit reports...'
+                    junit "${PROJECT_DIR}\\target\\surefire-reports\\*.xml"
                 }
             }
         }
 
         stage('Stop Docker Services') {
             steps {
-                echo ' Stopping containers...'
+                echo '🛑 Stopping containers...'
                 dir("${PROJECT_DIR}") {
-                    sh 'docker-compose -f docker-compose.yml down'
+                    bat "docker-compose -f docker-compose.yml down"
                 }
             }
         }
