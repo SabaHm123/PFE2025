@@ -3,7 +3,7 @@ pipeline {
 
     environment {
         SONARQUBE_ENV = 'SonarQubeServer'
-        DOCKER_COMPOSE_FILE = 'BackendPFE\\docker-compose.yml'
+        DOCKER_COMPOSE_FILE = 'docker-compose.yml'  // le fichier est à la racine
         PROJECT_DIR = 'BackendPFE'
     }
 
@@ -18,9 +18,7 @@ pipeline {
         stage('Start MySQL and MailDev') {
             steps {
                 echo '🐳 Starting Docker containers...'
-                dir("${PROJECT_DIR}") {
-                    bat "docker-compose -f docker-compose.yml up -d"
-                }
+                bat "docker-compose -f ${DOCKER_COMPOSE_FILE} up -d"
 
                 echo '⏳ Waiting for MySQL to be ready...'
                 bat '''
@@ -54,14 +52,13 @@ pipeline {
 
         stage('Run Tests') {
             steps {
-                echo '🧪 Running tests...'
+                echo '🧪 Running unit tests...'
                 dir("${PROJECT_DIR}") {
                     bat "./mvnw.cmd test"
                 }
             }
             post {
                 always {
-                    echo '📄 Publishing JUnit reports...'
                     junit "${PROJECT_DIR}\\target\\surefire-reports\\*.xml"
                 }
             }
@@ -70,9 +67,7 @@ pipeline {
         stage('Stop Docker Services') {
             steps {
                 echo '🛑 Stopping containers...'
-                dir("${PROJECT_DIR}") {
-                    bat "docker-compose -f docker-compose.yml down"
-                }
+                bat "docker-compose -f ${DOCKER_COMPOSE_FILE} down"
             }
         }
     }
