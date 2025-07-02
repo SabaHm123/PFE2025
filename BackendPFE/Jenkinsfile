@@ -12,16 +12,7 @@ pipeline {
       }
     }
 
-    stage('Clean Docker Containers') {
-      steps {
-        dir("${env.PROJECT_DIR}") {
-          bat '''
-            docker-compose down || echo "No containers to stop"
-            docker rm -f mysql-sql-bsn mail-dev-bsn || echo "Containers already removed"
-          '''
-        }
-      }
-    }
+   
 
     stage('Start MySQL and MailDev') {
       steps {
@@ -57,13 +48,7 @@ pipeline {
 
 
 
-    stage('Stop Docker Services') {
-      steps {
-        dir("${env.PROJECT_DIR}") {
-          bat 'docker-compose down'
-        }
-      }
-    }
+    
   }
 
   post {
